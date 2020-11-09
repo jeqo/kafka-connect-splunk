@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 final class KafkaRecordTracker {
     private static final Logger log = LoggerFactory.getLogger(SplunkSinkTask.class);
-    private ConcurrentHashMap<TopicPartition, TreeMap<Long, EventBatch>> all; // TopicPartition + Long offset represents the SinkRecord
+    private Map<TopicPartition, Map<Long, EventBatch>> all; // TopicPartition + Long offset represents the SinkRecord
     private AtomicLong total;
     private ConcurrentLinkedQueue<EventBatch> failed;
     private volatile Map<TopicPartition, OffsetAndMetadata> offsets;
@@ -57,14 +57,14 @@ final class KafkaRecordTracker {
             final SinkRecord record = (SinkRecord) event.getTied();
             TopicPartition tp = new TopicPartition(record.topic(), record.kafkaPartition());
             //log.debug("Processing topic {} partition {}", record.topic(), record.kafkaPartition());
-            TreeMap<Long, EventBatch> tpRecords = all.get(tp);
+            Map<Long, EventBatch> tpRecords = all.get(tp);
             if (tpRecords == null) {
                 log.error("KafkaRecordTracker removing a batch in an unknown partition {} {} {}", record.topic(), record.kafkaPartition(), record.kafkaOffset());
                 return;
             }
             long offset = -1;
             Iterator<Map.Entry<Long, EventBatch>> iter = tpRecords.entrySet().iterator();
-            for (; iter.hasNext();) {
+            while (iter.hasNext()) {
                 Map.Entry<Long, EventBatch> e = iter.next();
                 if (e.getValue().isCommitted()) {
                     //log.debug("processing offset {}", e.getKey());
@@ -98,9 +98,9 @@ final class KafkaRecordTracker {
             if (event.getTied() instanceof SinkRecord) {
                 final SinkRecord record = (SinkRecord) event.getTied();
                 TopicPartition tp = new TopicPartition(record.topic(), record.kafkaPartition());
-                TreeMap<Long, EventBatch> tpRecords = all.get(tp);
+                Map<Long, EventBatch> tpRecords = all.get(tp);
                 if (tpRecords == null) {
-                    tpRecords = new TreeMap<>();
+                    tpRecords = new ConcurrentHashMap<>();
                     all.put(tp, tpRecords);
                 }
 
